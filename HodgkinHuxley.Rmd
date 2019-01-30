@@ -1,0 +1,73 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(tidyverse)
+library(simecol)
+library(reshape2)
+```
+
+```{r}
+
+## Hodkin-Huxley model
+HH <- odeModel(
+main = function(time, init, parms) {
+  with(as.list(c(init, parms)),{
+
+    am <- function(v) 0.1*(v+40)/(1-exp(-(v+40)/10))
+    bm <- function(v) 4*exp(-(v+65)/18)
+    ah <- function(v) 0.07*exp(-(v+65)/20)
+    bh <- function(v) 1/(1+exp(-(v+35)/10))
+    an <- function(v) 0.01*(v+55)/(1-exp(-(v+55)/10))
+    bn <- function(v) 0.125*exp(-(v+65)/80)
+    
+    dv <- (I - gna*h*(v-Ena)*m^3-gk*(v-Ek)*n^4-gl*(v-El))/C
+    dm <- am(v)*(1-m)-bm(v)*m
+    dh <- ah(v)*(1-h)-bh(v)*h
+    dn <- an(v)*(1-n)-bn(v)*n
+    
+    return(list(c(dv, dm, dh, dn)))
+  })
+  },
+  ## Set parameters
+  parms = c(Ena=50, Ek=-77, El=-54.4, gna=120, gk=36, gl=0.3, C=1, I=0),
+  ## Set integrations times
+  times = c(from=0, to=40, by = 0.25),
+  ## Set initial state
+  init = c(v=-65, m=0.052, h=0.596, n=0.317),
+  solver = "lsoda"
+)
+```
+```{r}
+HH <- sim(HH)
+HH.out<-out(HH)
+HH.out.long<-melt(as.data.frame(HH.out),"time")
+```
+```{r}
+ggplot(HH.out.long,aes(x=time,y=value,colour=variable,group=variable))+
+  # Add line
+  geom_line(lwd=2)+
+  #Add labels
+  xlab("Time")+ylab("Number") +
+  facet_grid(vars(variable),scales='free')
+```
+
+```{r}
+## Stimulus
+I <- c(2, 5, 5.97, 5.975, 6.2, 6.5)
+sims <- do.call("rbind",
+          lapply(I, function(i){
+            parms(HH)["I"] <- i
+            HH <- sim(HH)
+            cbind(I=paste("I =", i), out(HH))
+          }))
+```
+```{r}
+ggplot(sims,aes(x=time,y=value,colour=variable,group=variable))+
+  # Add line
+  geom_line(lwd=2)+
+  #Add labels
+  xlab("Time")+ylab("Number") +
+  facet_grid(vars(I~),scales='free')
+```
