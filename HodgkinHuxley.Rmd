@@ -6,6 +6,7 @@ output: html_notebook
 library(tidyverse)
 library(simecol)
 library(reshape2)
+library(tidyr)
 ```
 
 ```{r}
@@ -60,14 +61,53 @@ sims <- do.call("rbind",
           lapply(I, function(i){
             parms(HH)["I"] <- i
             HH <- sim(HH)
-            cbind(I=paste("I =", i), out(HH))
+            cbind(I=paste("", i), out(HH))
           }))
 ```
-```{r}
+## ```{r}
 ggplot(sims,aes(x=time,y=value,colour=variable,group=variable))+
+  # Add line
+  geom_line (lwd=2)+
+  #Add labels
+  xlab("Time")+ylab("Number") +
+  facet_grid(vars(I~),scales='free')
+##```
+
+```{r}
+
+sims1<-gather(sims,"variable","value", 3:6)
+#sims1$I <-as.numeric(sims1$I)
+```
+
+```{r}
+ggplot(sims1,aes(x=time,y=value,colour=variable,group=variable))+
   # Add line
   geom_line(lwd=2)+
   #Add labels
   xlab("Time")+ylab("Number") +
-  facet_grid(vars(I~),scales='free')
+  facet_grid(variable ~ I, scales='free')
+```
+
+```{r}
+HH1 <- odeModel(
+main = function(time, init, parms) {
+  with(as.list(c(init, parms)),{
+    
+    voltage <- k*t/z*e * log(co/ci)
+    
+    return(list(c(voltage)))
+  })
+  },
+  ## Set parameters
+  parms = c(k=1.381*10^-23,t=27,z=-1,e=1.602*10^-19),
+  ## Set integrations times
+  times = c(from=0, to=40, by = 0.25),
+  ## Set initial state
+  init = c(co=0.56,ci=0.04),
+  solver = "lsoda"
+)
+```
+```{r}
+HH12 <- sim(HH1)
+plot(HH12)
 ```
